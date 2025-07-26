@@ -362,7 +362,7 @@ async def check_expiring_subscriptions():
             await bot.send_message(
                 payment.user_id,
                 "سلام 👋\n"
-                "اشتراک شما تا ۵ روز دیگه به پایان می‌رسه.\n\n"
+                "اشتراک شما تا ۲ روز دیگه به پایان می‌رسه.\n\n"
                 "برای جلوگیری از قطع سرویس، همین حالا می‌تونی تمدیدش کنی✅\n\n"
                 "📌 جهت تمدید اشتراک روی دکمه زیر کلیک کن👇",
                 buttons=main_inline_buttons
@@ -376,7 +376,7 @@ async def check_expiring_subscriptions():
 async def schedule_daily_check():
     while True:
         await check_expiring_subscriptions()
-        await asyncio.sleep(86400)  # هر ۱۰ ثانیه برای تست
+        await asyncio.sleep(86400)  
 
 loop = asyncio.get_event_loop()
 loop.create_task(schedule_daily_check())
