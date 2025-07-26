@@ -79,6 +79,7 @@ python bot.py
 📩 Support
 If you have questions or want to contribute, feel free to open an issue or pull request.
 
-🧑‍💻 Developer
-This project is developed and maintained by Matin Ebadi.
-Thank you for checking out the project!
+
+## 🙋 Developed by
+
+[Matin Ebadi (GitHub)](https://github.com/matinebadi)
