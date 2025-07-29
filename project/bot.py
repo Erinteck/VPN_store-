@@ -14,24 +14,24 @@ if not os.path.exists("qrcodes"):
 bot = TelegramClient("bot_session", api_id, api_hash).start(bot_token=bot_token)
 user_states = {}
 
-barcode_upload_count = 0  # شمارنده بارکدها
+barcode_upload_count = 0 
 
-# دکمه‌های کارت (اینلاین)
+
 card_buttons = [
     Button.inline("💳 کارت 6393", b"copy_card1"),
     Button.inline("💳 کارت 5859", b"copy_card2"),
 ]
 
-# دکمه‌های اصلی اینلاین بدون پشتیبان
+
 main_inline_buttons = [
     [Button.inline("💳 خرید اشتراک", b"buy")],
     [Button.inline("📲 دانلود اپ", b"download_app")],
 ]
 
-# دکمه پشتیبان به صورت Button.text (غیر اینلاین)
+
 support_button = [Button.text("🛠 پشتیبان", resize=True)]
 
-# دکمه‌های دانلود اپ (اینلاین)
+
 download_buttons = [
     [
         Button.url("🤖 نسخه اندروید", "https://download.wireguard.com/android-client/"),
@@ -56,7 +56,11 @@ async def start(event):
 @bot.on(events.CallbackQuery(data=b"buy"))
 async def buy(event):
     user_states[event.sender_id] = "awaiting_info"
-    await event.respond("لطفاً فامیلی + ۴ رقم آخر موبایل را وارد کن (مثال: barari 8264)")
+    await event.respond(
+        "لطفاً فامیلی + ۴ رقم آخر موبایل را وارد کن (مثال: barari 8264)",
+        buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
+    )
+
     await event.answer()
 
 @bot.on(events.CallbackQuery(data=b"download_app"))
@@ -67,39 +71,49 @@ async def download_app(event):
     )
     await event.answer()
 
+
 @bot.on(events.CallbackQuery(data=b"back_to_main"))
 async def back_to_main_callback(event):
+    user_id = event.sender_id
+
+    if user_support_state.get(user_id):
+        del user_support_state[user_id]
+
+
+    if support_reply_state.get(user_id):
+        del support_reply_state[user_id]
+
     await event.edit(
         "به منوی اصلی برگشتید، لطفا یکی از آیتم های زیر را انتخاب کنید 👇",
         buttons=main_inline_buttons
     )
     await event.answer()
 
-
-######################################################################################
+################################################################################ظ######
 ######################################################################################
 ######################################################################################
 
 support_id = 734514363
-user_support_state = {}        # وضعیت انتظار پیام کاربر
-support_reply_state = {}       # وضعیت انتظار پیام پشتیبان
+user_support_state = {}    
+support_reply_state = {}       
 
 @bot.on(events.NewMessage(pattern="🛠 پشتیبان"))
 async def support_button_pressed(event):
     user_id = event.sender_id
-    user_support_state[user_id] = True  # کاربر وارد حالت ارسال پیام شد
+    user_support_state[user_id] = True 
 
     await event.respond(
         "🧑‍💻 شما در حال ارسال پیام به پشتیبان هستید.\n"
         "لطفاً پیام متنی یا تصویری خود را وارد کنید.\n\n"
-        "⚠️ فقط پیام‌های متنی و تصویری مجاز هستند."
+        "⚠️ فقط پیام‌های متنی و تصویری مجاز هستند.",
+        buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
     )
+
 
 @bot.on(events.NewMessage())
 async def support_message_handler(event):
     user_id = event.sender_id
 
-    # --- پاسخ پشتیبان به کاربر ---
     if support_reply_state.get(user_id):
         target_user = support_reply_state.pop(user_id)
         try:
@@ -122,9 +136,9 @@ async def support_message_handler(event):
             print(f"❌ خطا در ارسال پیام به کاربر: {e}")
         return
 
-    # --- پیام کاربر برای پشتیبان ---
+
     if user_support_state.get(user_id):
-        # جلوگیری از ارسال مجدد دکمه
+
         if event.raw_text.strip() == "🛠 پشتیبان":
             return
 
@@ -132,7 +146,7 @@ async def support_message_handler(event):
 
         await event.respond("✅ پیام شما برای پشتیبان ارسال شد.")
 
-        # فرستادن پیام تصویری یا متنی برای پشتیبان
+  
         if event.photo or event.document:
             caption = event.text or "بدون کپشن"
             await bot.send_file(
@@ -191,8 +205,12 @@ async def handle_input(event):
             "(به نام میلاد مغربی)\n\n"
             "سپس رسید پرداخت را به صورت **عکس** ارسال کن 📸",
             parse_mode='markdown',
-            buttons=card_buttons
+            buttons=[
+                card_buttons,
+                [Button.inline("🔙 بازگشت", b"back_to_main")]
+            ]
         )
+
         return
 
     elif user_states.get(user_id) == "awaiting_receipt" and event.photo:
@@ -252,8 +270,10 @@ async def reject(event):
     try:
         await bot.send_message(
             payment.user_id,
-            "❌ رسید شما توسط ادمین تایید نشد.\nلطفاً دوباره یک عکس واضح از رسید ارسال کنید."
+            "❌ رسید شما توسط ادمین تایید نشد.\nلطفاً دوباره یک عکس واضح از رسید ارسال کنید.",
+            buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
         )
+
     except Exception as e:
         print(f"خطا در ارسال پیام رد به کاربر: {e}")
 
@@ -273,7 +293,12 @@ async def confirm(event):
 
     qrcode = session.query(QRCode).filter_by(is_used=False).order_by(QRCode.id).first()
     if not qrcode:
-        await bot.send_message(payment.user_id, "❌ بارکدها تمام شدند. لطفاً بعداً دوباره تلاش کنید.")
+        await bot.send_message(
+            payment.user_id,
+            "❌ بارکدها تمام شدند. لطفاً بعداً دوباره تلاش کنید.",
+            buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
+        )
+
         await bot.send_message(admin_ids[0], "🚨 بارکدها تمام شدند! لطفاً 20 بارکد جدید آپلود کنید.")
         return
 
@@ -362,7 +387,7 @@ async def check_expiring_subscriptions():
             await bot.send_message(
                 payment.user_id,
                 "سلام 👋\n"
-                "اشتراک شما تا ۲ روز دیگه به پایان می‌رسه.\n\n"
+                "اشتراک شما تا ۵ روز دیگه به پایان می‌رسه.\n\n"
                 "برای جلوگیری از قطع سرویس، همین حالا می‌تونی تمدیدش کنی✅\n\n"
                 "📌 جهت تمدید اشتراک روی دکمه زیر کلیک کن👇",
                 buttons=main_inline_buttons
@@ -376,7 +401,7 @@ async def check_expiring_subscriptions():
 async def schedule_daily_check():
     while True:
         await check_expiring_subscriptions()
-        await asyncio.sleep(86400)  
+        await asyncio.sleep(86400) 
 
 loop = asyncio.get_event_loop()
 loop.create_task(schedule_daily_check())
