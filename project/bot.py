@@ -93,7 +93,7 @@ async def back_to_main_callback(event):
 ######################################################################################
 ######################################################################################
 
-support_id = 734514363
+
 user_support_state = {}    
 support_reply_state = {}       
 
@@ -147,34 +147,35 @@ async def support_message_handler(event):
         await event.respond("✅ پیام شما برای پشتیبان ارسال شد.")
 
   
-        if event.photo or event.document:
-            caption = event.text or "بدون کپشن"
-            await bot.send_file(
-                support_id,
-                file=event.media,
-                caption=(
-                    f"📩 پیام تصویری از کاربر:\n"
+        for admin_id in admin_ids:
+            if event.photo or event.document:
+                caption = event.text or "بدون کپشن"
+                await bot.send_file(
+                    admin_id,
+                    file=event.media,
+                    caption=(
+                        f"📩 پیام تصویری از کاربر:\n"
+                        f"🆔 یوزرنیم: @{event.sender.username or 'ندارد'}\n"
+                        f"🧾 آیدی عددی: {user_id}\n\n"
+                        f"💬 کپشن:\n{caption}"
+                    ),
+                    buttons=[Button.inline("✉️ پاسخ به کاربر", data=f"reply_{user_id}")]
+                )
+            elif event.text:
+                await bot.send_message(
+                    admin_id,
+                    f"📩 پیام متنی از کاربر:\n"
                     f"🆔 یوزرنیم: @{event.sender.username or 'ندارد'}\n"
                     f"🧾 آیدی عددی: {user_id}\n\n"
-                    f"💬 کپشن:\n{caption}"
-                ),
-                buttons=[Button.inline("✉️ پاسخ به کاربر", data=f"reply_{user_id}")]
-            )
-        elif event.text:
-            await bot.send_message(
-                support_id,
-                f"📩 پیام متنی از کاربر:\n"
-                f"🆔 یوزرنیم: @{event.sender.username or 'ندارد'}\n"
-                f"🧾 آیدی عددی: {user_id}\n\n"
-                f"💬 پیام:\n{event.text}",
-                buttons=[Button.inline("✉️ پاسخ به کاربر", data=f"reply_{user_id}")]
-            )
+                    f"💬 پیام:\n{event.text}",
+                    buttons=[Button.inline("✉️ پاسخ به کاربر", data=f"reply_{user_id}")]
+                )
         else:
             await event.respond("❌ فقط پیام‌های متنی و تصویری پشتیبانی می‌شوند.")
 
 @bot.on(events.CallbackQuery(pattern=b"reply_\d+"))
 async def handle_support_reply_button(event):
-    if event.sender_id != support_id:
+    if event.sender_id not in admin_ids:
         await event.answer("⛔️ شما اجازه این عملیات را ندارید.", alert=True)
         return
 
@@ -231,15 +232,16 @@ async def handle_input(event):
 
         await event.respond("✅ رسید ثبت شد و در حال بررسی است.")
 
-        await bot.send_file(
-            admin_ids[0],
-            file=filename,
-            caption=f"🔔 رسید جدید از @{event.sender.username or 'کاربر'}\n{info}",
-            buttons=[
-                Button.inline("✅ تأیید", f"confirm_{payment.id}"),
-                Button.inline("❌ رد", f"reject_{payment.id}")
-            ]
-        )
+        for admin_id in admin_ids:
+            await bot.send_file(
+                admin_id,
+                file=filename,
+                caption=f"🔔 رسید جدید از @{event.sender.username or 'کاربر'}\n{info}",
+                buttons=[
+                    Button.inline("✅ تأیید", f"confirm_{payment.id}"),
+                    Button.inline("❌ رد", f"reject_{payment.id}")
+                ]
+            )
 
 @bot.on(events.CallbackQuery(data=b"copy_card1"))
 async def copy_card1(event):
@@ -262,7 +264,17 @@ async def reject(event):
         await event.respond("❌ پرداخت یافت نشد.")
         return
 
-    session.delete(payment)
+    # بررسی اینکه آیا قبلاً بررسی شده؟
+    if payment.status == "accepted":
+        await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} تایید شده و قابل رد نیست.")
+        return
+    elif payment.status == "rejected":
+        await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} رد شده و نیازی به رد مجدد نیست.")
+        return
+
+    # در این مرحله می‌تونیم رد کنیم
+    payment.status = "rejected"
+    payment.handled_by = event.sender_id
     session.commit()
 
     await event.respond("❌ رسید رد شد.")
@@ -273,9 +285,9 @@ async def reject(event):
             "❌ رسید شما توسط ادمین تایید نشد.\nلطفاً دوباره یک عکس واضح از رسید ارسال کنید.",
             buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
         )
-
     except Exception as e:
         print(f"خطا در ارسال پیام رد به کاربر: {e}")
+
 
 @bot.on(events.CallbackQuery(pattern=b"confirm_"))
 async def confirm(event):
@@ -284,13 +296,27 @@ async def confirm(event):
 
     payment_id = int(event.data.decode().split("_")[1])
     payment = session.get(Payment, payment_id)
+
     if not payment:
-        await event.respond("پرداخت یافت نشد.")
+        await event.respond("❌ پرداخت یافت نشد.")
         return
 
-    payment.is_confirmed = True
+    # جلوگیری از تایید مجدد
+    if payment.status == "accepted":
+        await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} تایید شده و نیازی به تایید مجدد نیست.")
+        return
+
+    # جلوگیری از تایید رسیدی که رد شده
+    if payment.status == "rejected":
+        await event.respond(f"🚫 این رسید قبلاً توسط ادمین {payment.handled_by} رد شده و قابل تایید نیست.")
+        return
+
+    # تایید و ثبت نام ادمین
+    payment.status = "accepted"
+    payment.handled_by = event.sender_id
     session.commit()
 
+    # ارسال بارکد
     qrcode = session.query(QRCode).filter_by(is_used=False).order_by(QRCode.id).first()
     if not qrcode:
         await bot.send_message(
@@ -299,7 +325,8 @@ async def confirm(event):
             buttons=[[Button.inline("🔙 بازگشت", b"back_to_main")]]
         )
 
-        await bot.send_message(admin_ids[0], "🚨 بارکدها تمام شدند! لطفاً 20 بارکد جدید آپلود کنید.")
+        for admin_id in admin_ids:
+            await bot.send_message(admin_id, "🚨 بارکدها تمام شدند! لطفاً 20 بارکد جدید آپلود کنید.")
         return
 
     qrcode.is_used = True
@@ -322,9 +349,11 @@ async def confirm(event):
     )
     await event.respond("✅ پرداخت تایید و بارکد ارسال شد.")
 
+    # هشدار اتمام بارکد
     remaining = session.query(QRCode).filter_by(is_used=False).count()
     if remaining == 5:
-        await bot.send_message(admin_ids[0], "⚠️ فقط ۵ بارکد باقی مانده! لطفاً بارکد های جدید را آماده کنید \n که زمانی پیام اتمام براتون ارسال شد بارکد هارو سریع آپلود کنید.")
+        for admin_id in admin_ids:
+            await bot.send_message(admin_id, "⚠️ فقط ۵ بارکد باقی مانده! لطفاً بارکد های جدید را آماده کنید.")
 
 @bot.on(events.Album())
 async def upload_album(event):
