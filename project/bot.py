@@ -264,7 +264,7 @@ async def reject(event):
         await event.respond("❌ پرداخت یافت نشد.")
         return
 
-    # بررسی اینکه آیا قبلاً بررسی شده؟
+
     if payment.status == "accepted":
         await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} تایید شده و قابل رد نیست.")
         return
@@ -272,7 +272,7 @@ async def reject(event):
         await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} رد شده و نیازی به رد مجدد نیست.")
         return
 
-    # در این مرحله می‌تونیم رد کنیم
+
     payment.status = "rejected"
     payment.handled_by = event.sender_id
     session.commit()
@@ -301,22 +301,22 @@ async def confirm(event):
         await event.respond("❌ پرداخت یافت نشد.")
         return
 
-    # جلوگیری از تایید مجدد
+
     if payment.status == "accepted":
         await event.respond(f"⚠️ این رسید قبلاً توسط ادمین {payment.handled_by} تایید شده و نیازی به تایید مجدد نیست.")
         return
 
-    # جلوگیری از تایید رسیدی که رد شده
+
     if payment.status == "rejected":
         await event.respond(f"🚫 این رسید قبلاً توسط ادمین {payment.handled_by} رد شده و قابل تایید نیست.")
         return
 
-    # تایید و ثبت نام ادمین
+
     payment.status = "accepted"
     payment.handled_by = event.sender_id
     session.commit()
 
-    # ارسال بارکد
+
     qrcode = session.query(QRCode).filter_by(is_used=False).order_by(QRCode.id).first()
     if not qrcode:
         await bot.send_message(
@@ -349,7 +349,7 @@ async def confirm(event):
     )
     await event.respond("✅ پرداخت تایید و بارکد ارسال شد.")
 
-    # هشدار اتمام بارکد
+
     remaining = session.query(QRCode).filter_by(is_used=False).count()
     if remaining == 5:
         for admin_id in admin_ids:
@@ -438,3 +438,4 @@ loop.create_task(schedule_daily_check())
 
 print("🤖 Bot is running...")
 bot.run_until_disconnected()
+
